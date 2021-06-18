@@ -14,10 +14,10 @@ import os
 def tests(path,agency,test_source,user_name):
     
     df=pd.read_csv(path)
-    
+    file=path.split(sep='/')[-1]
     #This is specifically for DNREC ELS lab EDDs
     df=df.drop(['CustomerName','ProjectName','OrderID','ELSSampleNumber','Site','Matrix',
-                'Analysis Time','LOQ','FieldQC','Dilution','Qualifier'],axis=1)
+                'Analysis Time','LOQ','FieldQC','Dilution','Qualifier'],axis=1,errors='ignore')
     df=df.rename(columns={'ReportingUnits':'units','Parameter':'test','Collect Date':'date_sampled',
                           'Collect Time':'time','Analysis Date':'date_analyzed','Method':'test_method'})
     #Change parameter names to Watsys test codes
@@ -26,7 +26,8 @@ def tests(path,agency,test_source,user_name):
         'Nitrate as N, Dissolved':'N2','Nitrite as N, Dissolved':'N3','Magnesium, Dissolved':'MG',
         'Bromide, Dissolved':'BR','Alkalinity (Titrimetric, pH 4.5), Dissolved':'ALK','Sulfate, Dissolved':'SO4',
         'Sodium, Dissolved':'NA','Nitrate/Nitrite as N, Dissolved':'NT','Residue, Filterable (TDS)':'TDS',
-        'Calcium, Dissolved':'CA'}
+        'Calcium, Dissolved':'CA','Chromium, Dissolved':'CR','Mercury, Dissolved':'HG','Manganese, Dissolved':'MN',
+        'Copper, Dissolved':'CU','Iron, Dissolved':'FED','Arsenic, Dissolved':'AS','Lead, Dissolved':'PB'}
     df['test']=reduce(lambda x, y: x.replace(y,dc[y]),dc,df['test'])
     #Another way to run through the dict
     # par=df['test']
@@ -39,7 +40,8 @@ def tests(path,agency,test_source,user_name):
             'AS':'EPA200.8',
             'CD':'EPA200.8',
             'CA':'EPA200.7',
-            'CL':'SM4500CL',
+#            'CL':'SM4500CL',
+            'CL':'EPA300.0',
             'CR':'EPA200.8',
             'CU':'EPA200.8',
             'FED':'EPA200.7',
@@ -68,9 +70,9 @@ def tests(path,agency,test_source,user_name):
     df['test_method']=reduce(lambda x, y: x.replace(y,methdc[y]),methdc,df['test'])
     
     
-    df['dgsid']='Fb31-'+(df['CustomerSampleNumber']).astype(str)
+    df['dgsid']=(df['CustomerSampleNumber']).astype(str)
     df['amount']=np.where(df['Result']=='ND',df['MDL'],df['Result'])
-    df['amount']=np.where(df['units']=='ug/L',(df['amount']).astype(float)/1000,df['amount'])
+    df['amount']=np.where(df['units']=='ug/L',((df['amount']).astype(float)/1000).map(lambda x: '{:.6f}'.format(x).rstrip('0')),df['amount'].astype(float))
     df['units']='M'
     df['units']=np.where(df['Result']=='ND','LM',df['units'])
     df['date_sampled']=pd.to_datetime(df['date_sampled']).dt.strftime('%m/%d/%Y')
@@ -84,6 +86,9 @@ def tests(path,agency,test_source,user_name):
     
     system_date=dt.date.today().strftime('%d-%b-%Y')
     
+    #Remove duplicate flags from DGSIDs
+    df['dgsid']=np.where(df.dgsid.str[-1:]=='D',df.dgsid.str[:-1],df.dgsid)
+    
     df['SQL']=("""insert into tests (system_date,user_name,test_source,agency,dgsid,date_sampled,\
     sampleid,date_analyzed,test,testid,test_method,units,amount) values ('""")+system_date+"','"+\
         user_name+"','"+test_source+"','"+agency+"','"+df['dgsid']+"','"+\
@@ -91,20 +96,20 @@ def tests(path,agency,test_source,user_name):
         df['test']+"','"+df['testid']+"','"+df['test_method']+"','"+df['units']+"',"+\
         df['amount'].astype(str)+");"
     endpath=os.path.split(path)[0]    
-    df.to_csv(endpath+'/tests_upload.csv',index=False,columns=['SQL'])
+    df.to_csv(endpath+'/tests_upload_'+file,index=False,columns=['SQL'])
     
 def quality(path,agency,user_name,record_by,sam_method):
     
     df=pd.read_csv(path)
-    
+    file=path.split(sep='/')[-1]
     #This is specifically for DNREC ELS lab EDDs
     df=df.drop(['CustomerName','ProjectName','OrderID','ELSSampleNumber','Site','Matrix',
                 'Analysis Time','LOQ','FieldQC','Dilution','Qualifier','Result','ReportingUnits',
-                'Parameter','Analysis Date','MDL'],axis=1)
+                'Parameter','Analysis Date','MDL'],axis=1,errors='ignore')
     df=df.rename(columns={'Collect Date':'date_sampled',
                           'Collect Time':'time','Method':'test_method'})
         
-    df['dgsid']='Fb31-'+(df['CustomerSampleNumber']).astype(str)
+    df['dgsid']=(df['CustomerSampleNumber']).astype(str)
     df['date_sampled']=pd.to_datetime(df['date_sampled']).dt.strftime('%m/%d/%Y')
     df['time']=pd.to_datetime(df['time']).dt.strftime('%H%M')
     df=df.assign(sampleid=lambda df:df['date_sampled']+df['dgsid']+'G')
@@ -117,9 +122,13 @@ def quality(path,agency,user_name,record_by,sam_method):
     #Quality constant variables
     system_date=dt.date.today().strftime('%d-%b-%Y')
     
+    #Remove duplicate flags from DGSIDs
+    df['dgsid']=np.where(df.dgsid.str[-1:]=='D',df.dgsid.str[:-1],df.dgsid)
+    
     df['SQL']=("""insert into quality (system_date,user_name,record_by,sam_method,agency,dgsid,\
     date_sampled,sampleid,time) values ('""")+system_date+"','"+\
         user_name+"','"+record_by+"','"+sam_method+"','"+agency+"','"+df['dgsid']+"','"+\
         df['date_sampled']+"','"+df['sampleid']+"','"+df['time']+"');"
+
     endpath=os.path.split(path)[0]    
-    df.to_csv(endpath+'/quality_upload.csv',index=False,columns=['SQL'])    
+    df.to_csv(endpath+'/quality_upload_'+file,index=False,columns=['SQL'])    
