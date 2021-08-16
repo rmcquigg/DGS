@@ -10,9 +10,10 @@ import numpy as np
 import datetime as dt
 import pandas as pd
 import os
+import warnings
 
 def tests(path,agency,test_source,user_name):
-    
+    warnings.filterwarnings('ignore')    
     df=pd.read_csv(path)
     file=path.split(sep='/')[-1]
     #This is specifically for DNREC ELS lab EDDs
@@ -23,11 +24,12 @@ def tests(path,agency,test_source,user_name):
     #Change parameter names to Watsys test codes
     from functools import reduce
     dc={'Potassium, Dissolved':'K','Iron, Dissolved':'FED','Chloride, Dissolved':'CL','Silica, Dissolved':'SI',
-        'Nitrate as N, Dissolved':'N2','Nitrite as N, Dissolved':'N3','Magnesium, Dissolved':'MG',
+        'Nitrate as N, Dissolved':'N3','Nitrite as N, Dissolved':'N2','Magnesium, Dissolved':'MG',
         'Bromide, Dissolved':'BR','Alkalinity (Titrimetric, pH 4.5), Dissolved':'ALK','Sulfate, Dissolved':'SO4',
         'Sodium, Dissolved':'NA','Nitrate/Nitrite as N, Dissolved':'NT','Residue, Filterable (TDS)':'TDS',
         'Calcium, Dissolved':'CA','Chromium, Dissolved':'CR','Mercury, Dissolved':'HG','Manganese, Dissolved':'MN',
-        'Copper, Dissolved':'CU','Iron, Dissolved':'FED','Arsenic, Dissolved':'AS','Lead, Dissolved':'PB'}
+        'Copper, Dissolved':'CU','Iron, Dissolved':'FED','Arsenic, Dissolved':'AS','Lead, Dissolved':'PB','Zinc, Dissolved':'ZN',
+        'Cadmium, Dissolved':'CD'}
     df['test']=reduce(lambda x, y: x.replace(y,dc[y]),dc,df['test'])
     #Another way to run through the dict
     # par=df['test']
@@ -36,45 +38,39 @@ def tests(path,agency,test_source,user_name):
     #     test.append(dc.get(p,p))
     
     #Change test methods to Watsys codes
-    methdc={'ALK':'SM2320',
-            'AS':'EPA200.8',
-            'CD':'EPA200.8',
-            'CA':'EPA200.7',
-#            'CL':'SM4500CL',
-            'CL':'EPA300.0',
-            'CR':'EPA200.8',
-            'CU':'EPA200.8',
-            'FED':'EPA200.7',
-            'PB':'EPA200.8',
-            'MG':'EPA200.8',
-            'HG':'EPA245.1',
-            'N23':'EPA353.2',
-            'N3':'EPA353.2',
-            'N2':'EPA353.2',
-            'K':'EPA200.7',
-            'NA':'EPA200.7',
-            'TDS':'SM2540C',
-            'SO4':'EPA300.0',
-            'FE':'EPA200.7',
-            'NT':'EPA353.2',
-            'TSS':'SM2450',
-            'TE':'EPA170.1',
-            'SC':'EPA120.1',
-            'PH':'EPA150.1',
+    methdc={'APHA 2320':'SM2320',
+            'EPA 200.8':'EPA200.8',
+            'EPA 200.7':'EPA200.7',
+            'APHA 4500-CL-(E)':'SM4500CL',
+            'EPA 300.0':'EPA300.0',
+            'EPA 245.1 CLP-M':'EPA245.1',
+            'USEPA 353.2':'EPA353.2',
+            'APHA 2540-C':'SM2540C',
+            'APHA 2450':'SM2450',
+            'EPA 170.1':'EPA170.1',
+            'EPA 120.1':'EPA120.1',
+            'EPA 150.1':'EPA150.1',
             'NAM':'SM4500',
             'COD':'EPA410.4',
-            'BR':'EPA300.0',
-            'AL':'EPA200.8',
-            'SI':'SM4500SIO2C',
-            'DO':'EPA360.1'}
-    df['test_method']=reduce(lambda x, y: x.replace(y,methdc[y]),methdc,df['test'])
-    
+            'APHA 4500-SIO2-C':'SM4500SIO2C',
+            'EPA 360.1':'EPA360.1'}
+    df['test_method']=reduce(lambda x, y: x.replace(y,methdc[y]),methdc,df['test_method'])
     
     df['dgsid']=(df['CustomerSampleNumber']).astype(str)
     df['amount']=np.where(df['Result']=='ND',df['MDL'],df['Result'])
-    df['amount']=np.where(df['units']=='ug/L',((df['amount']).astype(float)/1000).map(lambda x: '{:.6f}'.format(x).rstrip('0')),df['amount'].astype(float))
-    df['units']='M'
-    df['units']=np.where(df['Result']=='ND','LM',df['units'])
+    choices=['CL','NA','K','TDS','SO4','CA','ALK','SI','N2','NT','N3','MG']
+    mask=df['test'].isin(choices)
+    dfsub=df[mask]
+    dfsub['amount']=np.where(dfsub['units']=='ug/L',((dfsub['amount']).astype(float)/1000).map(lambda x: '{:.6f}'.format(x).rstrip('0')),dfsub['amount'].astype(float))
+    df=df[~mask]
+    #df['amount']=np.where(df['units']=='ug/L',((df['amount']).astype(float)/1000).map(lambda x: '{:.6f}'.format(x).rstrip('0')),df['amount'].astype(float))
+    dfsub['units']='M'
+    dfsub['units']=np.where(dfsub['Result']=='ND','L'+dfsub['units'],dfsub['units'])
+    df['units']=np.where(df['units']=='ug/L','U',df['units'])
+    df['units']=np.where(df['units']=='mg/L','M',df['units'])
+    df['units']=np.where(df['Result']=='ND','L'+df['units'],df['units'])
+    df=df.append(dfsub).sort_values(by='CustomerSampleNumber')
+    
     df['date_sampled']=pd.to_datetime(df['date_sampled']).dt.strftime('%m/%d/%Y')
     df['date_analyzed']=pd.to_datetime(df['date_analyzed']).dt.strftime('%y%m%d')
     #Only run next statement if there any blanks in date_analyzed
@@ -97,7 +93,7 @@ def tests(path,agency,test_source,user_name):
         df['amount'].astype(str)+");"
     endpath=os.path.split(path)[0]    
     df.to_csv(endpath+'/tests_upload_'+file,index=False,columns=['SQL'])
-    
+
 def quality(path,agency,user_name,record_by,sam_method):
     
     df=pd.read_csv(path)
