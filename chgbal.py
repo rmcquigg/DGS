@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 
 def chgbal(path):
-    #file='N:/DeMonNetPhase1/WQMNW/data/lab_reports/2105018_EDD_edit.csv'
+    #path='N:/Stormwater/Hydro_data/Lab WQ data/lab_field_reports/2106032_EDD_Re-Release.csv'
     newpath=path.split(sep='.')[-2]
     df=pd.read_csv(path,na_values='ND')
     df['Result']=pd.to_numeric(df.Result)
@@ -68,8 +68,10 @@ def chgbal(path):
     CL_ROW=np.where(df.index.str.contains('Chloride'))[0]
     FE_ROW=np.where(df.index.str.contains('Iron'))[0]
     MG_ROW=np.where(df.index.str.contains('Magnesium'))[0]
-    N3_ROW=np.where(df.index.str.contains('Nitrate'))[0]
-    N2_ROW=np.where(df.index.str.contains('Nitrite'))[0]
+#    N3_ROW=np.where(df.index.str.contains('Nitrate'))[0]
+#    N2_ROW=np.where(df.index.str.contains('Nitrite'))[0]
+    N3_ROW=np.where(df.index=='Nitrate as N, Dissolved')[0]
+    N2_ROW=np.where(df.index=='Nitrite as N, Dissolved')[0]
     K_ROW=np.where(df.index.str.contains('Potassium'))[0]
     NA_ROW=np.where(df.index.str.contains('Sodium'))[0]
     SO4_ROW=np.where(df.index.str.contains('Sulfate'))[0]
