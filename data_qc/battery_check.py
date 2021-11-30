@@ -3,6 +3,8 @@
 Created on Tue Oct 12 09:04:52 2021
 @author: mcquiggan
 """
+#Checks datalogger battery life from In-Situ csv download files in a specified directory
+#Function below and use at the bottom
 import csv
 import pandas as pd
 import os
@@ -40,6 +42,6 @@ def bat_life(path):
     df['well']=well
     df.to_csv(path+'/bat_life_check.csv',index=False)
     
-
+#____________________________________________________
 path='S:/Common/DATA/WATLEV/troll_unc/PreProcess/temp'
 bat_life(path)
