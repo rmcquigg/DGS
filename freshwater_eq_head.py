@@ -4,6 +4,7 @@ Created on Mon Feb 15 13:20:49 2021
 
 @author: mcquiggan
 """
+#To convert pressure logger-measured water level to freshwater equivalent head
 import pandas as pd
 import matplotlib.pyplot as plt
 
