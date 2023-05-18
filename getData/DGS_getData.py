@@ -6,39 +6,67 @@ Created on Wed May 17 17:24:28 2023
 """
 
 import pandas as pd
-import requests
-import xml.etree.ElementTree as ET
-import os
 
-def waterLevels (sites):
+def waterLevels(sites):
     dict={}
     with open('readme.txt', 'w') as f:
         f.write('Thanks for downloading water level data from the Delaware Geological Survey!'+
-                '\nPlease contact delgeosurvey@udel.edu with any questions.'+
-                '\nSiteID = DGS well identifier \nDate = Month/Day/Year \nTime = HHMM Eastern Standard Time'+
-                '\nTimeZone = Eastern Standard Time \nWaterLevel = depth to water in feet below ground surface')
+                '\nPlease visit our website www.dgs.udel.edu for more information.'+
+                '\nSITEID = DGS well identifier \DATE_MEASURED = Month/Day/Year'+
+                '\nTIME = HHMM Eastern Standard Time, DM indicates daily average taken from continuous logger-measurements'+
+                '\nTIMEZONE= Eastern Standard Time \nWATER_LEVEL = depth to water in feet below ground surface')
     for id in sites:
-        url='http://data.dgs.udel.edu/sites/ngwmn/well_waterlevels.php?dgsid='+id
-        resp=requests.get(url)
-        # a=str(resp.content)
-        with open('levels.xml','wb') as foutput:
-            foutput.write(resp.content)
-        with open('levels.xml') as file:
-            tree=ET.parse(file)
-            root=tree.getroot()
-            df=pd.DataFrame(columns=['SiteID','Date','Time','TimeZone','TimestampISO','WaterLevel']).set_index('TimestampISO')
-            for item in root:
-                dgsid=item[0].text
-                day=item[1].text
-                tm=item[2].text
-                tz=item[3].text
-                tsISO=item[4].text
-                wl=item[5].text
-                df=df.append(pd.DataFrame({'SiteID':dgsid,'Date':day,'Time':tm,'TimeZone':tz,'TimestampISO':tsISO,
-                                             'WaterLevel':wl},index=[tsISO]))
-                # d={'df' + str(id):df for id in sites}
-                dict[id]=df.set_index('TimestampISO')
-                df.to_csv(dgsid+'.csv',index=False)
-        os.remove('levels.xml')
-    return(dict)        
-            
+        url='http://data.dgs.udel.edu/sites/webwatlev/'+id+'.txt'
+        try: 
+            df=pd.read_csv(url,skiprows=3)
+            df=df.rename(columns=lambda x: x.strip())
+            df['SITEID']=id
+            df['TIMEZONE']='EST'
+            df['newt']=df['TIME'].where(df['TIME']!='DM','0000')
+            df['TIMESTAMP']=pd.to_datetime(df['DATE_MEASURED'] + " " + df['newt'])
+            df=df.drop('newt',axis=1)
+            cols=['SITEID','DATE_MEASURED','TIME','TIMEZONE','WATER_LEVEL','TIMESTAMP']
+            df=df[cols]
+            dict[id]=df.set_index('TIMESTAMP')
+            df.to_csv(id+'.csv',index='TIMESTAMP')
+        except:
+            print('Data for '+id+' are not available.')
+            continue
+    return(dict)
+        
+        
+        
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
